@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <!-- 網頁基本編碼與標題設定 -->
+  <meta charset="UTF-8" />
+  <title>帆船受力與航向模擬</title>
+
+  <style>
+    /* 整體頁面背景：淡色漸層，營造紙雕的溫暖感 */
+    body {
+      margin: 0;                           /* 移除預設外距 */
+      font-family: "Noto Sans TC", sans-serif; /* 使用適合中文的無襯線字體 */
+      background: radial-gradient(circle at top, #fdf7e7, #f0f4ff); /* 柔和漸層背景 */
+      color: #333;                         /* 文字顏色 */
+      display: flex;                       /* 使用 flex 讓內容置中 */
+      justify-content: center;             /* 水平置中 */
+      align-items: center;                 /* 垂直置中 */
+      min-height: 100vh;                   /* 視窗高度至少 100% */
+    }
+
+    /* 主容器：白色卡片搭配陰影，類似紙雕層次 */
+    .card {
+      background: #ffffff;                 /* 白色卡片底色 */
+      border-radius: 20px;                 /* 圓角邊框 */
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15); /* 柔和陰影 */
+      padding: 20px 28px;                  /* 內距 */
+      display: grid;                       /* 使用 grid 排版 */
+      grid-template-columns: 1.1fr 0.9fr;  /* 左右比例：左邊圖、右邊控制面板 */
+      gap: 16px;                           /* 欄間距 */
+      max-width: 1000px;                   /* 最大寬度 */
+      width: 100%;                         /* 充滿可用空間 */
+    }
+
+    /* 左側標題與說明區塊 */
+    .left-panel {
+      display: flex;                       /* 使用 flex 排版 */
+      flex-direction: column;              /* 由上而下排列 */
+      align-items: center;                 /* 水平置中 */
+    }
+
+    /* 標題樣式 */
+    h1 {
+      margin: 4px 0 10px;                  /* 上、左右、下外距 */
+      font-size: 22px;                     /* 字體大小 */
+      letter-spacing: 0.08em;              /* 字距拉開一點，像標題字 */
+      text-align: center;                  /* 文字置中 */
+    }
+
+    /* 小提醒文字 */
+    .hint {
+      font-size: 13px;                     /* 較小文字 */
+      color: #777;                         /* 淡灰色 */
+      margin-bottom: 6px;                  /* 下方外距 */
+      text-align: center;                  /* 文字置中 */
+    }
+
+    /* SVG 外框：仿紙板的邊框與陰影 */
+    .svg-wrapper {
+      background: #fdfbf6;                 /* 淡米色底，像紙 */
+      border-radius: 18px;                 /* 圓角 */
+      padding: 10px;                       /* 內距 */
+      box-shadow: inset 0 0 0 1px #ece2d0;/* 內框線，仿切割紙邊 */
+    }
+
+    /* 右側控制面板容器 */
+    .controls {
+      display: flex;                       /* 使用 flex 排版 */
+      flex-direction: column;              /* 垂直排列 */
+      gap: 10px;                           /* 各控制區塊間距 */
+      font-size: 14px;                     /* 文字大小 */
+    }
+
+    /* 每一組滑桿區塊 */
+    .control-group {
+      background: #f8f8ff;                 /* 淺藍色底 */
+      border-radius: 12px;                 /* 圓角 */
+      padding: 10px 12px;                  /* 內距 */
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05); /* 細緻陰影 */
+    }
+
+    /* 控制標題（滑桿名稱） */
+    .control-group label {
+      display: flex;                       /* 使用 flex */
+      justify-content: space-between;      /* 左右兩端對齊：名稱與數值 */
+      align-items: baseline;               /* 與基線對齊 */
+      font-weight: 600;                    /* 半粗體 */
+      margin-bottom: 4px;                  /* 下方外距 */
+    }
+
+    /* 滑桿本身的樣式 */
+    .control-group input[type="range"] {
+      width: 100%;                         /* 滿版寬度 */
+      -webkit-appearance: none;            /* 移除預設樣式（Safari/Chrome） */
+      background: transparent;             /* 背景透明，由自訂樣式處理 */
+    }
+
+    /* 滑桿軌道樣式 */
+    .control-group input[type="range"]::-webkit-slider-runnable-track {
+      height: 6px;                         /* 軌道高度 */
+      background: linear-gradient(to right, #b3d4ff, #ffe1c4); /* 漸層色 */
+      border-radius: 999px;                /* 圓形軌道 */
+    }
+
+    /* 滑桿控制鈕樣式（Chrome/Safari） */
+    .control-group input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;            /* 取消預設 */
+      width: 16px;                         /* 寬度 */
+      height: 16px;                        /* 高度 */
+      border-radius: 50%;                  /* 圓形 */
+      background: #ffffff;                 /* 白色 */
+      border: 2px solid #ffaf66;          /* 橘色外框 */
+      margin-top: -5px;                    /* 向上位移，讓拇指置中在軌道 */
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05); /* 細陰影 */
+    }
+
+    /* 滑桿軌道樣式（Firefox） */
+    .control-group input[type="range"]::-moz-range-track {
+      height: 6px;                         /* 軌道高度 */
+      background: linear-gradient(to right, #b3d4ff, #ffe1c4); /* 漸層 */
+      border-radius: 999px;                /* 圓角 */
+    }
+
+    /* 滑桿控制鈕樣式（Firefox） */
+    .control-group input[type="range"]::-moz-range-thumb {
+      width: 16px;                         /* 寬度 */
+      height: 16px;                        /* 高度 */
+      border-radius: 50%;                  /* 圓形 */
+      background: #ffffff;                 /* 白色 */
+      border: 2px solid #ffaf66;          /* 橘色外框 */
+      box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.05); /* 細陰影 */
+    }
+
+    /* 說明文字（例如 slider 下方的補充說明） */
+    .explain {
+      font-size: 12px;                     /* 小字 */
+      color: #666;                         /* 灰色 */
+      margin-top: 4px;                     /* 上方外距 */
+      line-height: 1.4;                    /* 行距 */
+    }
+
+    /* 航向結果文字顯示區塊 */
+    .result-panel {
+      margin-top: 6px;                     /* 上方外距 */
+      padding: 8px 10px;                   /* 內距 */
+      background: #fff9e6;                 /* 淺黃色底 */
+      border-radius: 10px;                 /* 圓角 */
+      border: 1px dashed #f1c36b;         /* 虛線邊框，增加手作感 */
+      font-size: 13px;                     /* 字體大小 */
+      line-height: 1.5;                    /* 行距 */
+    }
+
+    /* 讓小標題強調一點 */
+    .result-panel strong {
+      color: #e67e22;                      /* 橘色文字 */
+    }
+  </style>
+</head>
+<body>
+  <!-- 主卡片容器 -->
+  <div class="card">
+    <!-- 左側：SVG 模擬圖與標題 -->
+    <div class="left-panel">
+      <!-- 標題 -->
+      <h1>帆船受力與航向小實驗</h1>
+      <!-- 小提醒：說明座標系統 -->
+      <div class="hint">＊0° 在畫面頂端，角度順時針增加；箭頭為最後航行方向。</div>
+
+      <!-- SVG 外層包裹，用來製造紙板邊框效果 -->
+      <div class="svg-wrapper">
+        <!-- 主視覺使用 SVG，方便旋轉與平移各元素 -->
+        <svg id="scene" width="520" height="520">
+          <!-- 定義中心點座標（方便參考）：cx=260, cy=260 -->
+          <!-- 360 度方位圈：外圈圓形 -->
+          <circle
+            cx="260" cy="260" r="230"
+            fill="#fefaf3"
+            stroke="#e0d4c0"
+            stroke-width="2"
+            stroke-dasharray="4 4"
+          ></circle>
+
+          <!-- 方位角刻度：每 30 度一條較長刻度 -->
+          <!-- 使用 12 條線手工標出，營造紙質羅盤感 -->
+          <!-- 0° (上) 刻度 -->
+          <line x1="260" y1="40" x2="260" y2="55" stroke="#d0c0a0" stroke-width="2" />
+          <!-- 30° -->
+          <line x1="330" y1="53" x2="322" y2="67" stroke="#d0c0a0" stroke-width="2" />
+          <!-- 60° -->
+          <line x1="389" y1="92" x2="378" y2="104" stroke="#d0c0a0" stroke-width="2" />
+          <!-- 90° -->
+          <line x1="420" y1="150" x2="405" y2="158" stroke="#d0c0a0" stroke-width="2" />
+          <!-- 120° -->
+          <line x1="433" y1="220" x2="417" y2="222" stroke="#d0c0a0" stroke-width="2" />
+          <!-- 150° -->
+          <line x1="420" y1="290" x2="405" y2="282" stroke="#d0c0a0" stroke-width="2" />
+          <!-- 180° -->
+          <line x1="389" y1="348" x2="378" y2="336" stroke="#d0c0a0" stroke-width="2" />
+          <!-- 210° -->
+          <line x1="330" y1="387" x2="322" y2="373" stroke="#d0c0a0" stroke-width="2" />
+          <!-- 240° -->
+          <line x1="260" y1="400" x2="260" y2="385" stroke="#d0c0a0" stroke-width="2" />
+          <!-- 270° -->
+          <line x1="190" y1="387" x2="198" y2="373" stroke="#d0c0a0" stroke-width="2" />
+          <!-- 300° -->
+          <line x1="131" y1="348" x2="142" y2="336" stroke="#d0c0a0" stroke-width="2" />
+          <!-- 330° -->
+          <line x1="100" y1="290" x2="115" y2="282" stroke="#d0c0a0" stroke-width="2" />
+
+          <!-- 東(90)、西(270)、南(180)、北(0) 文字標註 -->
+          <text x="256" y="32" font-size="12" fill="#999">0°</text>
+          <text x="430" y="158" font-size="12" fill="#999">90°</text>
+          <text x="254" y="410" font-size="12" fill="#999">180°</text>
+          <text x="82" y="158" font-size="12" fill="#999">270°</text>
+
+          <!-- 風向箭頭群組：從外圈吹向中心 -->
+          <g id="windArrowGroup" transform="translate(260,260)">
+            <!-- 風向文字小標籤 -->
+            <text x="0" y="-195" text-anchor="middle" font-size="13" fill="#1e88e5">
+              風向（來風）
+            </text>
+            <!-- 箭頭主幹：由外圈指向中心 -->
+            <line
+              x1="0" y1="-180" x2="0" y2="-120"
+              stroke="#42a5f5"
+              stroke-width="5"
+              stroke-linecap="round"
+            ></line>
+            <!-- 箭頭箭頭 -->
+            <polygon
+              points="0,-186 -7,-176 7,-176"
+              fill="#42a5f5"
+            ></polygon>
+          </g>
+
+          <!-- 最終航向箭頭群組：從船中心向外 -->
+          <g id="netArrowGroup" transform="translate(260,260)">
+            <!-- 航向文字小標籤 -->
+            <text x="0" y="182" text-anchor="middle" font-size="13" fill="#ff7043">
+              最終航向
+            </text>
+            <!-- 航向主箭頭：由船中心往外 -->
+            <line
+              x1="0" y1="0" x2="0" y2="-130"
+              stroke="#ff7043"
+              stroke-width="6"
+              stroke-linecap="round"
+            ></line>
+            <!-- 箭頭箭頭 -->
+            <polygon
+              points="0,-144 -9,-126 9,-126"
+              fill="#ff7043"
+            ></polygon>
+          </g>
+
+          <!-- 船隻本體群組：固定朝向 0°（畫面上方） -->
+          <g id="boatGroup" transform="translate(260,260)">
+            <!-- 船體陰影，增加紙雕感 -->
+            <ellipse
+              cx="4" cy="10" rx="70" ry="170"
+              fill="rgba(0,0,0,0.08)"
+            ></ellipse>
+
+            <!-- 船體外殼 -->
+            <path
+              d="M0,-160
+                 C60,-140 70,-60 70,40
+                 C70,110 40,150 0,165
+                 C-40,150 -70,110 -70,40
+                 C-70,-60 -60,-140 0,-160Z"
+              fill="#fdfdfd"
+              stroke="#c1c8d0"
+              stroke-width="3"
+            ></path>
+
+            <!-- 船艙甲板 -->
+            <path
+              d="M0,-135
+                 C40,-120 50,-50 50,30
+                 C50,90 30,130 0,145
+                 C-30,130 -50,90 -50,30
+                 C-50,-50 -40,-120 0,-135Z"
+              fill="#ffe4c4"
+              stroke="#f0c49b"
+              stroke-width="2"
+            ></path>
+
+            <!-- 龍骨（keel）：位於船底中央 -->
+            <rect
+              x="-6" y="40" width="12" height="70"
+              fill="#90caf9"
+              stroke="#5a8bb0"
+              stroke-width="2"
+              rx="4" ry="4"
+            ></rect>
+
+            <!-- 舵（rudder）：稍微外露在船尾，待會用 JS 做旋轉 -->
+            <g id="rudderGroup">
+              <rect
+                x="-4" y="105" width="8" height="40"
+                fill="#ffcc80"
+                stroke="#f2a65a"
+                stroke-width="2"
+                rx="3" ry="3"
+              ></rect>
+            </g>
+
+            <!-- 船桅（mast）：固定不動 -->
+            <rect
+              x="-4" y="-110" width="8" height="110"
+              fill="#b0bec5"
+              stroke="#90a4ae"
+              stroke-width="2"
+              rx="3" ry="3"
+            ></rect>
+
+            <!-- 帆（sail）：由 JS 控制旋轉 -->
+            <g id="sailGroup">
+              <!-- 這裡用一塊偏三角形的帆，營造紙雕感 -->
+              <path
+                d="M0,-105
+                   Q55,-45 35,40
+                   Q15,20 0,15Z"
+                fill="#fffde7"
+                stroke="#fdd835"
+                stroke-width="2"
+              ></path>
+            </g>
+
+            <!-- 顯示船首方向的虛線 -->
+            <line
+              x1="0" y1="-150" x2="0" y2="160"
+              stroke="#d0d7de"
+              stroke-width="1.5"
+              stroke-dasharray="5 4"
+            ></line>
+
+            <!-- 船首三角形，用於視覺上更像帆船 -->
+            <polygon
+              points="0,-160 10,-140 -10,-140"
+              fill="#cfd8dc"
+              stroke="#b0bec5"
+              stroke-width="2"
+            ></polygon>
+          </g>
+
+          <!-- 額外：在右上角顯示風速數值小貼紙 -->
+          <g transform="translate(410,70)">
+            <rect
+              x="-40" y="-20" width="80" height="40"
+              rx="10" ry="10"
+              fill="#e3f2fd"
+              stroke="#90caf9"
+              stroke-width="2"
+            ></rect>
+            <text
+              id="windSpeedBadge"
+              x="0" y="4"
+              font-size="13"
+              text-anchor="middle"
+              fill="#1565c0"
+            >風速：0 節</text>
+          </g>
+        </svg>
+      </div>
+    </div>
+
+    <!-- 右側：控制滑桿與結果說明 -->
+    <div class="controls">
+      <!-- 風向控制 -->
+      <div class="control-group">
+        <label for="windDir">
+          <span>風向（來風角度）</span>
+          <!-- 顯示即時數值 -->
+          <span id="windDirValue">0°</span>
+        </label>
+        <!-- range: 0~359，0 代表從畫面頂端往下吹 -->
+        <input id="windDir" type="range" min="0" max="359" value="0" />
+        <div class="explain">
+          0° 表示從畫面上方向下吹；角度順時針增加，例如 90° 為從右往左吹。
+        </div>
+      </div>
+
+      <!-- 風速控制 -->
+      <div class="control-group">
+        <label for="windSpeed">
+          <span>風速</span>
+          <!-- 顯示即時風速數值 -->
+          <span id="windSpeedValue">5 節</span>
+        </label>
+        <!-- range: 0~20，假設單位「節」 -->
+        <input id="windSpeed" type="range" min="0" max="20" value="5" />
+        <div class="explain">
+          單位以「節」粗略表示，數值愈大，帆的受力愈明顯。
+        </div>
+      </div>
+
+      <!-- 帆的攻角（對船首而言的角度） -->
+      <div class="control-group">
+        <label for="sailAngle">
+          <span>帆的角度（相對船首）</span>
+          <!-- 顯示帆角度 -->
+          <span id="sailAngleValue">15°</span>
+        </label>
+        <!-- range: -80~80 度，負值代表向右（starboard），正值向左（port） -->
+        <input id="sailAngle" type="range" min="-80" max="80" value="15" />
+        <div class="explain">
+          0° 代表帆與船身對齊；正值向左張開，負值向右張開。
+          模擬中只用於估算帆面受到風的作用方向與大小。
+        </div>
+      </div>
+
+      <!-- 舵向（rudder angle） -->
+      <div class="control-group">
+        <label for="rudderAngle">
+          <span>舵向</span>
+          <!-- 顯示舵角度 -->
+          <span id="rudderAngleValue">0°</span>
+        </label>
+        <!-- range: -45~45 度 -->
+        <input id="rudderAngle" type="range" min="-45" max="45" value="0" />
+        <div class="explain">
+          正值代表向左舵（船頭右轉），負值代表向右舵。
+          在模型中用來微調最終合力的方向。
+        </div>
+      </div>
+
+      <!-- 結果顯示區：航向角度與物理說明 -->
+      <div class="result-panel">
+        <div><strong>模擬結果：</strong></div>
+        <div id="resultHeadingText">航向角度：0°（目前與船首方向一致）</div>
+        <div id="resultExtraText">
+          帆產生的推力被龍骨轉換為前進力，舵向則讓船身稍微偏轉。此模型為簡化的向量疊加示意，非真實航速計算。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- JavaScript：處理物理近似與 SVG 互動 -->
+  <script>
+    // === 取得滑桿與顯示文字的 DOM 元素 ===
+    const windDirSlider = document.getElementById("windDir");            // 風向滑桿
+    const windSpeedSlider = document.getElementById("windSpeed");        // 風速滑桿
+    const sailAngleSlider = document.getElementById("sailAngle");        // 帆角度滑桿
+    const rudderAngleSlider = document.getElementById("rudderAngle");    // 舵角滑桿
+
+    const windDirValue = document.getElementById("windDirValue");        // 顯示風向數字
+    const windSpeedValue = document.getElementById("windSpeedValue");    // 顯示風速數字
+    const sailAngleValue = document.getElementById("sailAngleValue");    // 顯示帆角度數字
+    const rudderAngleValue = document.getElementById("rudderAngleValue");// 顯示舵角度數字
+
+    const windArrowGroup = document.getElementById("windArrowGroup");    // SVG 中的風向群組
+    const netArrowGroup = document.getElementById("netArrowGroup");      // SVG 中的航向群組
+    const sailGroup = document.getElementById("sailGroup");              // 帆圖形群組
+    const rudderGroup = document.getElementById("rudderGroup");          // 舵圖形群組
+
+    const windSpeedBadge = document.getElementById("windSpeedBadge");    // 右上角風速貼紙文字
+    const resultHeadingText = document.getElementById("resultHeadingText"); // 結果：航向文字
+    const resultExtraText = document.getElementById("resultExtraText");      // 結果：補充說明
+
+    // === 一些常數設定 ===
+    const BOAT_HEADING_DEG = 0;                                          // 船首固定指向 0°（向上）
+    const MAX_RUDDER_DEG = 45;                                           // 舵角最大值，用於正規化
+    const KEEL_STRENGTH = 1.1;                                           // 龍骨抵抗橫移的強度倍率
+    const DRAG_COEFF = 0.15;                                             // 簡單的前進阻力係數（越大越難前進）
+
+    // === 工具函式：角度與向量運算 ===
+
+    // 將角度（度）轉換為弧度
+    function degToRad(deg) {
+      return (deg * Math.PI) / 180;                                      // 度數 × π / 180
+    }
+
+    // 將弧度轉換為角度（0~360 範圍）
+    function radToDeg(rad) {
+      return ((rad * 180) / Math.PI + 360) % 360;                        // 轉回度數並限制在 0~360
+    }
+
+    // 將角度（0° 在畫面上方，順時針增加）轉成 2D 單位向量
+    function angleToVec(deg) {
+      const rad = degToRad(deg);                                         // 先轉換成弧度
+      const x = Math.sin(rad);                                           // x 分量使用 sin（因 0° 在上方）
+      const y = -Math.cos(rad);                                          // y 分量使用 -cos（畫面向下為正）
+      return { x, y };                                                   // 回傳向量物件
+    }
+
+    // 將向量轉回角度（0° 在上方，順時針增加）
+    function vecToAngleDeg(v) {
+      const rad = Math.atan2(v.x, -v.y);                                 // atan2 以 (x, -y) 對應我們的座標
+      return radToDeg(rad);                                              // 轉成度數並歸一到 0~360
+    }
+
+    // 向量相加
+    function vecAdd(a, b) {
+      return { x: a.x + b.x, y: a.y + b.y };                             // 分別加總 x 與 y
+    }
+
+    // 向量乘上倍數（縮放）
+    function vecScale(v, s) {
+      return { x: v.x * s, y: v.y * s };                                 // 分別乘上比例 s
+    }
+
+    // 內積（dot product）
+    function vecDot(a, b) {
+      return a.x * b.x + a.y * b.y;                                      // 內積公式
+    }
+
+    // 向量長度（模）
+    function vecMag(v) {
+      return Math.hypot(v.x, v.y);                                       // 使用 hypot 計算 √(x² + y²)
+    }
+
+    // 計算兩個角度的差（結果在 -180°~+180°）
+    function diffDeg(a, b) {
+      let d = (a - b + 540) % 360 - 180;                                 // 先平移再用餘數技巧
+      return d;                                                          // 回傳差值
+    }
+
+    // === 核心更新函式：根據滑桿值計算受力與航向並更新畫面 ===
+    function updateScene() {
+      // 1. 讀取目前滑桿數值 --------------------------------------
+      const windDir = parseFloat(windDirSlider.value);                   // 風向（來風方向，度）
+      const windSpeed = parseFloat(windSpeedSlider.value);               // 風速（節，僅用作比例）
+      const sailRelDeg = parseFloat(sailAngleSlider.value);              // 帆相對船首的角度
+      const rudderDeg = parseFloat(rudderAngleSlider.value);             // 舵角度
+
+      // 2. 即時更新數值顯示 ----------------------------------------
+      windDirValue.textContent = `${windDir.toFixed(0)}°`;               // 顯示風向
+      windSpeedValue.textContent = `${windSpeed.toFixed(0)} 節`;         // 顯示風速
+      sailAngleValue.textContent = `${sailRelDeg.toFixed(0)}°`;          // 顯示帆角
+      rudderAngleValue.textContent = `${rudderDeg.toFixed(0)}°`;         // 顯示舵角
+      windSpeedBadge.textContent = `風速：${windSpeed.toFixed(1)} 節`;    // 更新右上角貼紙文字
+
+      // 3. 基本方向向量 --------------------------------------------
+      const boatHeadingDeg = BOAT_HEADING_DEG;                           // 船首角度（固定）
+      const boatForward = angleToVec(boatHeadingDeg);                    // 船首朝向單位向量
+      const boatSide = angleToVec(boatHeadingDeg + 90);                  // 船橫向單位向量（由右往左）
+
+      // 風是「從 windDir 方向吹來」，所以氣流往相反方向流動：
+      const windToDeg = (windDir + 180) % 360;                           // 氣流流向角度
+      const windFlow = angleToVec(windToDeg);                            // 氣流流向單位向量
+
+      // 帆的絕對角度（相對世界座標，而非相對船首）
+      const sailAbsDeg = boatHeadingDeg + sailRelDeg;                    // 帆角度＝船首＋相對角度
+      const sailDir = angleToVec(sailAbsDeg);                            // 帆的方向向量（沿帆展開方向）
+
+      // 4. 模擬帆的受力 --------------------------------------------
+      //   思路：假設帆受到的主要力量沿「帆的法線方向」，其大小與
+      //   （風向與帆的交角）之 sin 成正比。這不是完整的空氣動力學，
+      //   但能提供合理的向量疊加示意。
+
+      // 計算風流方向與帆方向之角度差（0~180°）
+      const attackAbs = Math.abs(diffDeg(windToDeg, sailAbsDeg));        // 攻角（絕對值）
+      const attackRad = degToRad(Math.min(attackAbs, 180));              // 轉成弧度（限制最大 180）
+
+      // 利用 sin(攻角) 當作升力比例：90° 時效果最大，0° 或 180° 時為 0
+      const liftFactor = Math.sin(attackRad);                             // 升力比例（0~1）
+      const sailForceMag =
+        windSpeed * liftFactor * 0.9;                                    // 帆受力大小，0.9 只是調整感覺用
+
+      // 設定帆法線方向（先假設法線角度＝帆角度＋90°）
+      let sailNormalDeg = (sailAbsDeg + 90) % 360;                        // 法線角度
+      let sailNormal = angleToVec(sailNormalDeg);                         // 法線向量
+
+      // 確保法線方向帶有「向前」成分，如果是朝後就翻轉 180°
+      const forwardComponent = vecDot(sailNormal, boatForward);           // 和船首方向的內積
+      if (forwardComponent < 0) {                                         // 若向後
+        sailNormalDeg = (sailNormalDeg + 180) % 360;                      // 角度翻轉 180°
+        sailNormal = angleToVec(sailNormalDeg);                           // 重新取得向量
+      }
+
+      // 帆受力向量 Fs = sailNormal * sailForceMag
+      let Fs = vecScale(sailNormal, sailForceMag);                        // 帆力向量
+
+      // 若風速很小，避免方向因數值雜訊而亂跳
+      if (windSpeed < 0.1) {
+        Fs = { x: 0, y: 0 };                                              // 基本上沒有帆力
+      }
+
+      // 5. 模擬龍骨產生的升力（抵抗橫移） ----------------------------
+      //   思路：龍骨主要抵消帆力在船橫向的分量，使船比較不會側滑，
+      //   並把更多力量轉成前進方向。
+
+      // 先把帆力分解到船身前後向與左右向
+      const FsForwardScalar = vecDot(Fs, boatForward);                    // 帆力在前進方向的投影大小
+      const FsSideScalar = vecDot(Fs, boatSide);                          // 帆力在側向的投影大小
+
+      // 龍骨力主要反向作用於側向分量，大小略大於帆的側向分量
+      const keelSideScalar = -FsSideScalar * KEEL_STRENGTH;               // 龍骨側向投影
+      const Fk = vecScale(boatSide, keelSideScalar);                      // 龍骨力向量
+
+      // 順便加上一點前進阻力（模擬水阻），與前進分量成比例
+      const dragScalar = -FsForwardScalar * DRAG_COEFF;                   // 前進阻力大小
+      const Fdrag = vecScale(boatForward, dragScalar);                    // 阻力向量
+
+      // 6. 舵的影響 -----------------------------------------------
+      //   舵實際上會產生轉動力矩，這裡簡化成在尾部的「側向推力」，
+      //   使合力方向朝舵指的反方向偏一點。
+
+      const rudderRatio = rudderDeg / MAX_RUDDER_DEG;                     // 正規化到 -1~1
+      const rudderMag = sailForceMag * 0.4 * rudderRatio;                 // 舵力強度與帆力成比例
+      const Fr = vecScale(boatSide, rudderMag);                           // 舵力向量（左右偏移）
+
+      // 7. 合力計算：Fnet = Fs + Fk + Fdrag + Fr -------------------
+      let Fnet = vecAdd(Fs, Fk);                                          // 先加帆力與龍骨力
+      Fnet = vecAdd(Fnet, Fdrag);                                         // 再加上阻力
+      Fnet = vecAdd(Fnet, Fr);                                            // 最後加入舵的影響
+
+      // 8. 合力方向與大小轉成航向 -------------------------------
+      const netMag = vecMag(Fnet);                                        // 合力大小
+      let headingDeg;                                                     // 最終航向角度
+
+      if (netMag < 0.01) {
+        // 如果幾乎沒有合力（例如完全無風），就讓航向維持在船首方向
+        headingDeg = boatHeadingDeg;                                      // 航向＝船首方向
+      } else {
+        // 正常情況下，航向沿著合力方向
+        headingDeg = vecToAngleDeg(Fnet);                                 // 將合力向量轉為角度
+      }
+
+      // 9. 更新 SVG 中的箭頭與帆／舵的角度 -----------------------
+      // 更新風向箭頭的旋轉：以中心為原點，旋轉到「來風方向」
+      const windTransform = `translate(260,260) rotate(${windDir})`;      // 組合 transform 字串
+      windArrowGroup.setAttribute("transform", windTransform);            // 套用到風向群組
+
+      // 更新航向箭頭的旋轉：0° 時向上，因此用 headingDeg 直接旋轉
+      const netTransform = `translate(260,260) rotate(${headingDeg})`;    // 航向箭頭 transform
+      netArrowGroup.setAttribute("transform", netTransform);              // 套用到航向群組
+
+      // 更新帆的旋轉：相對船首的角度即可
+      const sailTransform = `rotate(${sailRelDeg})`;                      // 帆繞自身原點旋轉
+      sailGroup.setAttribute("transform", sailTransform);                 // 套用帆的 transform
+
+      // 更新舵的旋轉：舵通常在船尾，小角度即可
+      const rudderTransform = `rotate(${rudderDeg})`;                     // 舵旋轉
+      rudderGroup.setAttribute("transform", rudderTransform);             // 套用舵的 transform
+
+      // 10. 更新文字說明 -----------------------------------------
+      // 先整理航向相對於船首的角度差（正值代表偏左，負值偏右）
+      const relHeading = diffDeg(headingDeg, boatHeadingDeg);             // 航向相對船首角度
+
+      // 組合說明文字
+      const headingStr = `航向角度：${headingDeg.toFixed(1)}°（相對船首偏 ${
+        relHeading >= 0 ? "左" : "右"
+      } 約 ${Math.abs(relHeading).toFixed(1)}°）`;                       // 主要文字
+
+      resultHeadingText.textContent = headingStr;                         // 更新顯示
+
+      // 額外文字：根據風向與攻角簡單判斷情境
+      let extra = "";                                                     // 初始化說明字串
+
+      // 判斷相對風向（船首到來風的夾角）
+      const relWindToBow = Math.abs(diffDeg(windDir, boatHeadingDeg));    // 0°=逆風，180°=順風
+
+      if (windSpeed < 0.5) {
+        extra = "幾乎沒有風，帆船只能非常緩慢地漂移。";                  // 無風情境
+      } else if (relWindToBow < 35) {
+        extra =
+          "風幾乎正對船頭，處於逆風區（No-Go Zone），合力主要被龍骨抵銷，難以前進。"; // 逆風
+      } else if (relWindToBow < 80) {
+        extra =
+          "接近迎風航行（Close Reach），帆產生明顯升力，龍骨把大部分側向力轉成前進力。"; // 迎風
+      } else if (relWindToBow < 140) {
+        extra =
+          "約在橫風或偏順風（Beam / Broad Reach），通常是帆船速度最快、感受最舒服的風向。"; // 橫風
+      } else {
+        extra =
+          "接近順風航行（Running），帆更多是被風推著走，速度穩定但對舵與帆的控制較敏感。"; // 順風
+      }
+
+      // 加上舵向的影響描述
+      if (Math.abs(rudderDeg) > 5) {
+        extra += ` 目前舵向為 ${
+          rudderDeg > 0 ? "左舵" : "右舵"
+        }，因此航向相對於自然合力被略微偏轉。`;                       // 描述舵的影響
+      }
+
+      // 更新結果區段的補充文字
+      resultExtraText.textContent =
+        extra + "（本互動僅為概念性向量疊加示意，方便理解帆、龍骨與舵如何共同決定航向。）";
+    }
+
+    // === 為每個滑桿註冊事件監聽器：一變動就更新畫面 ===
+    windDirSlider.addEventListener("input", updateScene);                 // 風向改變時更新
+    windSpeedSlider.addEventListener("input", updateScene);               // 風速改變時更新
+    sailAngleSlider.addEventListener("input", updateScene);               // 帆角度改變時更新
+    rudderAngleSlider.addEventListener("input", updateScene);             // 舵角度改變時更新
+
+    // === 初始化畫面：載入時先執行一次 ===
+    updateScene();                                                        // 執行初始化更新
+  </script>
+</body>
+</html>
